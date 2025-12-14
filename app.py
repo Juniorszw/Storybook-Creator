@@ -13,10 +13,33 @@ if not api_key:
 
 genai.configure(api_key=api_key)
 
+# 2. PROMPT ENGINEERING (Basic)
+SYSTEM_PROMPT = """
+You are a professional children's book author.
+Generate a 3-page story topic provided by the user.
+Output strict JSON format.
+
+Structure:
+{
+  "title": "Story Title",
+  "pages": [
+    {
+      "page_number": 1,
+      "story_text": "The narrative text for this page.",
+      "image_prompt": "A detailed image description."
+    }
+  ]
+}
+"""
+
 st.title("Storybook Creator: Feature Prototype")
 
 # User Input
 user_topic = st.text_input("What should the story be about?", placeholder="e.g., A brave robot")
 
 if st.button("Generate"):
-    st.success("API Key found! Ready to generate.")
+    if user_topic:
+        with st.spinner("Generating..."):
+            model = genai.GenerativeModel('gemini-flash-latest')
+            response = model.generate_content(f"{SYSTEM_PROMPT}\n\nTOPIC: {user_topic}")
+            st.write(response.text)
