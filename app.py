@@ -51,6 +51,7 @@ st.title("Storybook Creator: Feature Prototype")
 # User Input
 user_topic = st.text_input("What should the story be about?", placeholder="e.g., A brave robot")
 
+# 4. GENERATION LOGIC
 if st.button("Generate Storyboard"):
     if not user_topic:
         st.warning("Please enter a topic first.")
@@ -72,9 +73,32 @@ if st.button("Generate Storyboard"):
                     st.error("The AI returned invalid JSON. Please try again.")
                     st.stop()
                 
-                # Test Display: Just show the title to prove parsing worked
-                st.success(f"Success! Generated Story: {story_data['title']}")
-                st.info("Data parsed successfully. Ready for UI construction.")
+# 5. DISPLAY RESULTS
+                st.success(f"Generated: {story_data['title']}")
+                st.divider()
+                
+                # Loop through the pages and display them
+                for page in story_data['pages']:
+                    with st.container():
+                        st.subheader(f"Page {page['page_number']}")
+                        col1, col2 = st.columns([1, 2])
+                        
+                        with col1:
+                            st.warning("Image Prompt")
+                            st.caption(page['image_prompt'])
+                            # Placeholder image - Proof that we have a slot ready for Stable Diffusion
+                            st.image("https://placehold.co/400x300?text=Stable+Diffusion+Pending", use_container_width=True)
+                        
+                        with col2:
+                            st.success("Story Text")
+                            st.write(f"### {page['story_text']}")
+                            st.caption("Audio Integration Pending")
+                        
+                    st.divider()
+
+                # Show the raw JSON to prove "Structure Compliance" for the report
+                with st.expander("View Raw JSON (Technical Output)"):
+                    st.json(story_data)
 
             except Exception as e:
                 st.error(f"An error occurred: {e}")
