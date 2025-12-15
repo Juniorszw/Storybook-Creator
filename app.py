@@ -1,6 +1,7 @@
 import streamlit as st
 import google.generativeai as genai
 import os
+import json
 from dotenv import load_dotenv
 
 # 1. SETUP: Load Environment Variables
@@ -50,9 +51,30 @@ st.title("Storybook Creator: Feature Prototype")
 # User Input
 user_topic = st.text_input("What should the story be about?", placeholder="e.g., A brave robot")
 
-if st.button("Generate"):
-    if user_topic:
-        with st.spinner("Generating..."):
-            model = genai.GenerativeModel('gemini-flash-latest')
-            response = model.generate_content(f"{SYSTEM_PROMPT}\n\nTOPIC: {user_topic}")
-            st.write(response.text)
+if st.button("Generate Storyboard"):
+    if not user_topic:
+        st.warning("Please enter a topic first.")
+    else:
+        with st.spinner("Orchestrating narrative and visual prompts..."):
+            try:
+                # Call Gemini API
+                model = genai.GenerativeModel('gemini-flash-latest')
+                full_prompt = f"{SYSTEM_PROMPT}\n\nTOPIC: {user_topic}"
+                
+                response = model.generate_content(full_prompt)
+                
+                # Parse JSON (Cleaning the output)
+                clean_text = response.text.strip().replace("```json", "").replace("```", "")
+                
+                try:
+                    story_data = json.loads(clean_text)
+                except json.JSONDecodeError:
+                    st.error("The AI returned invalid JSON. Please try again.")
+                    st.stop()
+                
+                # Test Display: Just show the title to prove parsing worked
+                st.success(f"Success! Generated Story: {story_data['title']}")
+                st.info("Data parsed successfully. Ready for UI construction.")
+
+            except Exception as e:
+                st.error(f"An error occurred: {e}")
