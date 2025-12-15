@@ -13,11 +13,12 @@ if not api_key:
 
 genai.configure(api_key=api_key)
 
-# 2. PROMPT ENGINEERING (Basic)
+# 2. PROMPT ENGINEERING (Advanced)
 SYSTEM_PROMPT = """
-You are a professional children's book author.
-Generate a 3-page story topic provided by the user.
-Output strict JSON format.
+You are a professional children's book author and illustrator. 
+I will give you a topic. You must generate a 3-page story.
+You must output the result in strict JSON format. 
+Do not add any markdown formatting (like ```json). Just the raw JSON.
 
 Structure:
 {
@@ -25,12 +26,14 @@ Structure:
   "pages": [
     {
       "page_number": 1,
-      "story_text": "The narrative text for this page.",
-      "image_prompt": "A detailed image description."
-    }
+      "story_text": "The narrative text for this page (2-3 sentences, rhyming couplets suitable for children).",
+      "image_prompt": "A highly detailed description of the visual scene for an AI image generator. Include style keywords like 'watercolor', 'warm lighting'."
+    },
+    ... (repeat for 3 pages)
   ]
 }
 """
+
 st.set_page_config(page_title="AI Storybook Prototype")
 
 # 3. Sidebar for user instructions
