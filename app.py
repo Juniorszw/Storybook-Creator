@@ -31,6 +31,16 @@ Structure:
   ]
 }
 """
+st.set_page_config(page_title="AI Storybook Prototype")
+
+# 3. Sidebar for user instructions
+with st.sidebar:
+    st.header("How to use")
+    st.write("1. Enter a topic for your story.")
+    st.write("2. Click 'Generate'.")
+    st.write("3. Review the AI-generated text.")
+    st.divider()
+    st.info("Note: Image and Audio generation features are coming in Phase 3.")
 
 st.title("Storybook Creator: Feature Prototype")
 
