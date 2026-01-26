@@ -2,19 +2,52 @@ import streamlit as st
 import google.generativeai as genai
 import os
 import json
+import requests
+from PIL import Image
+from io import BytesIO
 from dotenv import load_dotenv
 
 # 1. SETUP: Load Environment Variables
 load_dotenv()
 
-api_key = os.getenv("GEMINI_API_KEY")
-if not api_key:
-    st.error("API Key not found! Please check your .env file.")
+# Get keys from .env
+google_key = os.getenv("GEMINI_API_KEY")
+hf_key = os.getenv("HUGGINGFACE_API_KEY")
+
+# Safety Check: Stop if keys are missing
+if not google_key:
+    st.error("GEMINI_API_KEY not found! Please check your .env file.")
     st.stop()
 
-genai.configure(api_key=api_key)
+if not hf_key:
+    st.error("HUGGINGFACE_API_KEY not found! Please check your .env file.")
+    st.stop()
 
-# 2. PROMPT ENGINEERING (Advanced)
+# Configure Gemini
+genai.configure(api_key=google_key)
+model = genai.GenerativeModel('gemini-flash-latest')
+
+# Configure Hugging Face (SDXL Model)
+API_URL = "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-xl-base-1.0"
+headers = {"Authorization": f"Bearer {hf_key}"}
+
+# Generate Image from Text 
+def generate_image(prompt):
+    """
+    Sends the text prompt to Hugging Face and returns the actual image.
+    """
+    payload = {"inputs": prompt}
+    try:
+        response = requests.post(API_URL, headers=headers, json=payload)
+        image_bytes = response.content
+        # Convert raw data into an image file
+        image = Image.open(BytesIO(image_bytes))
+        return image
+    except Exception as e:
+        print(f"Error generating image: {e}")
+        return None
+
+# 2. PROMPT ENGINEERING
 SYSTEM_PROMPT = """
 You are a professional children's book author and illustrator. 
 I will give you a topic. You must generate a 3-page story.
@@ -27,7 +60,7 @@ Structure:
   "pages": [
     {
       "page_number": 1,
-      "story_text": "The narrative text for this page (2-3 sentences, rhyming couplets suitable for children).",
+      "story_text": "The narrative text (rhyming couplets suitable for children).",
       "image_prompt": "A highly detailed description of the visual scene for an AI image generator. Include style keywords like 'watercolor', 'warm lighting'."
     },
     ... (repeat for 3 pages)
@@ -35,18 +68,16 @@ Structure:
 }
 """
 
-st.set_page_config(page_title="AI Storybook Prototype")
+st.set_page_config(page_title="AI Storybook Phase 3", page_icon="🎨")
 
-# 3. Sidebar for user instructions
+# 3. Sidebar
 with st.sidebar:
     st.header("How to use")
-    st.write("1. Enter a topic for your story.")
+    st.write("1. Enter a topic.")
     st.write("2. Click 'Generate'.")
-    st.write("3. Review the AI-generated text.")
-    st.divider()
-    st.info("Note: Image and Audio generation features are coming in Phase 3.")
+    st.info("Phase 3 Active: Real Image Generation Enabled! 🎨")
 
-st.title("Storybook Creator: Feature Prototype")
+st.title("Storybook Creator: Multimodal Build")
 
 # User Input
 user_topic = st.text_input("What should the story be about?", placeholder="e.g., A brave robot")
@@ -56,49 +87,42 @@ if st.button("Generate Storyboard"):
     if not user_topic:
         st.warning("Please enter a topic first.")
     else:
-        with st.spinner("Orchestrating narrative and visual prompts..."):
+        with st.spinner("Writing story and painting pictures... (This may take 30s)"):
             try:
-                # Call Gemini API
-                model = genai.GenerativeModel('gemini-flash-latest')
+                # STEP A: GENERATE TEXT (Gemini) 
                 full_prompt = f"{SYSTEM_PROMPT}\n\nTOPIC: {user_topic}"
-                
                 response = model.generate_content(full_prompt)
                 
-                # Parse JSON (Cleaning the output)
+                # Clean JSON
                 clean_text = response.text.strip().replace("```json", "").replace("```", "")
+                story_data = json.loads(clean_text)
                 
-                try:
-                    story_data = json.loads(clean_text)
-                except json.JSONDecodeError:
-                    st.error("The AI returned invalid JSON. Please try again.")
-                    st.stop()
-                
-# 5. DISPLAY RESULTS
                 st.success(f"Generated: {story_data['title']}")
                 st.divider()
                 
-                # Loop through the pages and display them
+                # STEP B: GENERATE IMAGES (Hugging Face)
                 for page in story_data['pages']:
                     with st.container():
                         st.subheader(f"Page {page['page_number']}")
-                        col1, col2 = st.columns([1, 2])
+                        col1, col2 = st.columns([1, 1])
                         
                         with col1:
-                            st.warning("Image Prompt")
-                            st.caption(page['image_prompt'])
-                            # Placeholder image - Proof that we have a slot ready for Stable Diffusion
-                            st.image("https://placehold.co/400x300?text=Stable+Diffusion+Pending", use_container_width=True)
+                            st.info("🎨 Generating Art...")
+                            
+                            # CALL THE NEW FUNCTION HERE
+                            real_image = generate_image(page['image_prompt'])
+                            
+                            if real_image:
+                                st.image(real_image, caption=page['image_prompt'])
+                            else:
+                                st.error("Image generation failed (Check API quota).")
                         
                         with col2:
-                            st.success("Story Text")
-                            st.write(f"### {page['story_text']}")
-                            st.caption("Audio Integration Pending")
+                            st.markdown(f"### 📖 Story")
+                            st.write(page['story_text'])
+                            st.caption("🔊 Audio Pending")
                         
                     st.divider()
-
-                # Show the raw JSON to prove "Structure Compliance" for the report
-                with st.expander("View Raw JSON (Technical Output)"):
-                    st.json(story_data)
 
             except Exception as e:
                 st.error(f"An error occurred: {e}")
