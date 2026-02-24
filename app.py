@@ -6,6 +6,7 @@ import requests
 from PIL import Image
 from io import BytesIO
 from dotenv import load_dotenv
+import random
 
 # 1. SETUP: Load Environment Variables
 load_dotenv()
@@ -32,11 +33,13 @@ API_URL = "https://router.huggingface.co/hf-inference/models/stabilityai/stable-
 headers = {"Authorization": f"Bearer {hf_key}"}
 
 # Generate Image from Text 
-def generate_image(prompt):
+def generate_image(prompt, seed):
     """
     Sends the text prompt to Hugging Face and returns the actual image.
     """
-    payload = {"inputs": prompt}
+    payload = {"inputs": prompt,
+        "parameters": {"seed": seed}
+    }
     try:
         response = requests.post(API_URL, headers=headers, json=payload)
         image_bytes = response.content
@@ -57,13 +60,13 @@ Do not add any markdown formatting (like ```json). Just the raw JSON.
 Structure:
 {
   "title": "Story Title",
+  "character_design": "A strict 1-sentence physical description of the main character (e.g., 'A 10-year-old boy with messy brown hair, wearing a red t-shirt and blue jeans.').",
   "pages": [
     {
       "page_number": 1,
       "story_text": "The narrative text (rhyming couplets suitable for children).",
-      "image_prompt": "A highly detailed description of the visual scene for an AI image generator. Include style keywords like 'watercolor', 'warm lighting'."
-    },
-    ... (repeat for 3 pages)
+      "image_prompt": "Describe the background and action for this scene. DO NOT describe the character's physical appearance here. Include style keywords like 'watercolor'."
+    }
   ]
 }
 """
@@ -87,6 +90,9 @@ if st.button("Generate Storyboard"):
     if not user_topic:
         st.warning("Please enter a topic first.")
     else:
+        # Generate ONE seed to be used for the entire story
+        story_seed = random.randint(1, 1000000) 
+        
         with st.spinner("Writing story and painting pictures... (This may take 30s)"):
             try:
                 # STEP A: GENERATE TEXT (Gemini) 
@@ -101,6 +107,9 @@ if st.button("Generate Storyboard"):
                 st.divider()
                 
                 # STEP B: GENERATE IMAGES (Hugging Face)
+                # Grab the master character description
+                character_context = story_data.get('character_design', '')
+                
                 for page in story_data['pages']:
                     with st.container():
                         st.subheader(f"Page {page['page_number']}")
@@ -109,11 +118,13 @@ if st.button("Generate Storyboard"):
                         with col1:
                             st.info("🎨 Generating Art...")
                             
-                            # CALL THE NEW FUNCTION HERE
-                            real_image = generate_image(page['image_prompt'])
+                            # GLUE THEM TOGETHER: Character Design + Scene Description
+                            full_prompt = f"{character_context} {page['image_prompt']}"
                             
+                            # CALL THE NEW FUNCTION HERE WITH THE SEED AND FULL PROMPT
+                            real_image = generate_image(full_prompt, story_seed)                            
                             if real_image:
-                                st.image(real_image, caption=page['image_prompt'])
+                                st.image(real_image, caption=full_prompt)
                             else:
                                 st.error("Image generation failed (Check API quota).")
                         
