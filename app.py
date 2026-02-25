@@ -7,6 +7,7 @@ from PIL import Image
 from io import BytesIO
 from dotenv import load_dotenv
 import random
+from gtts import gTTS
 
 # 1. SETUP: Load Environment Variables
 load_dotenv()
@@ -48,6 +49,20 @@ def generate_image(prompt, seed):
         return image
     except Exception as e:
         print(f"Error generating image: {e}")
+        return None
+
+# Generate Audio from Text
+def generate_audio(text):
+    """
+    Converts the story text into speech and returns it as audio bytes.
+    """
+    try:
+        tts = gTTS(text=text, lang='en', slow=False)
+        fp = BytesIO()
+        tts.write_to_fp(fp)
+        return fp.getvalue()
+    except Exception as e:
+        print(f"Error generating audio: {e}")
         return None
 
 # 2. PROMPT ENGINEERING
@@ -131,8 +146,13 @@ if st.button("Generate Storyboard"):
                         with col2:
                             st.markdown(f"### 📖 Story")
                             st.write(page['story_text'])
-                            st.caption("🔊 Audio Pending")
-                        
+                            
+                            # GENERATE AND PLAY AUDIO
+                            audio_bytes = generate_audio(page['story_text'])
+                            if audio_bytes:
+                                st.audio(audio_bytes, format='audio/mp3')
+                            else:
+                                st.error("Audio generation failed.")                        
                     st.divider()
 
             except Exception as e:
