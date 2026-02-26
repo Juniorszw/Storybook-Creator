@@ -146,19 +146,31 @@ if st.session_state.story_data:
             col1, col2 = st.columns([1, 1])
             
             with col1:
-                st.info("🎨 Generating Art...")
+                st.info("🎨 Image Settings")
                 
-                # Combine Character Design + Scene Description
-                full_prompt = f"{character_context} {page['image_prompt']}"
+                # 1. Define the initial full prompt (Character + Scene)
+                initial_full_prompt = f"{character_context} {page['image_prompt']}"
                 
-                # Call image function (It will instantly load from cache if already generated)
-                real_image = generate_image(full_prompt, st.session_state.story_seed)
+                # 2. Peek into memory to see if the user edited this specific box
+                widget_key = f"img_edit_{page['page_number']}"
+                current_prompt = st.session_state.get(widget_key, initial_full_prompt)
                 
-                if real_image:
-                    st.image(real_image, caption=full_prompt)
-                else:
-                    st.error("Image generation failed (Check API quota).")
-            
+                # 3. Generate and display the image FIRST (above the text box)
+                with st.spinner("Painting image..."):
+                    real_image = generate_image(current_prompt, st.session_state.story_seed)
+                    
+                    if real_image:
+                        st.image(real_image)
+                    else:
+                        st.error("Image generation failed (Check API quota).")
+                
+                # 4. Display the larger text box BELOW the image
+                st.text_area(
+                    "Edit the full image prompt:", 
+                    value=initial_full_prompt, 
+                    key=widget_key, 
+                    height=200
+                )            
             with col2:
                 st.markdown(f"### 📖 Story")
                 
