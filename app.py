@@ -96,6 +96,9 @@ if 'story_seed' not in st.session_state:
 if 'story_data' not in st.session_state:
     st.session_state.story_data = None
 
+if 'current_page' not in st.session_state:
+    st.session_state.current_page = 0
+
 with st.sidebar:
     st.header("How to use")
     st.write("1. Enter a topic.")
@@ -135,58 +138,67 @@ if st.session_state.story_data:
     st.success(f"Generated: {story_data['title']}")
     st.divider()
     
-    # Grab the master character description
+    # Grab the master character description and total pages
     character_context = story_data.get('character_design', '')
+    total_pages = len(story_data['pages'])
     
-    # STEP B: GENERATE IMAGES & AUDIO
-    for page in story_data['pages']:
-        with st.container():
-            st.subheader(f"Page {page['page_number']}")
-            col1, col2 = st.columns([1, 1])
+    # PAGINATION LOGIC 
+    # Instead of a loop, we only grab the page the user is currently on
+    current_index = st.session_state.current_page
+    page = story_data['pages'][current_index]
+    
+    with st.container():
+        st.subheader(f"Page {page['page_number']} of {total_pages}")
+        
+        # Left side = Image (col1), Right side = Text (col2)
+        col1, col2 = st.columns([1, 1])
+        
+        with col1:
+            st.info("🎨 Image Settings")
+            initial_full_prompt = f"{character_context} {page['image_prompt']}"
+            widget_key = f"img_edit_{page['page_number']}"
+            current_prompt = st.session_state.get(widget_key, initial_full_prompt)
             
-            with col1:
-                st.info("🎨 Image Settings")
-                
-                # 1. Define the initial full prompt (Character + Scene)
-                initial_full_prompt = f"{character_context} {page['image_prompt']}"
-                
-                # 2. Peek into memory to see if the user edited this specific box
-                widget_key = f"img_edit_{page['page_number']}"
-                current_prompt = st.session_state.get(widget_key, initial_full_prompt)
-                
-                # 3. Generate and display the image FIRST (above the text box)
-                with st.spinner("Painting image..."):
-                    real_image = generate_image(current_prompt, st.session_state.story_seed)
-                    
-                    if real_image:
-                        st.image(real_image)
-                    else:
-                        st.error("Image generation failed (Check API quota).")
-                
-                # 4. Display the larger text box BELOW the image
-                st.text_area(
-                    "Edit the full image prompt:", 
-                    value=initial_full_prompt, 
-                    key=widget_key, 
-                    height=200
-                )            
-            with col2:
-                st.markdown(f"### 📖 Story")
-                
-                # THE EDITABLE TEXT BOX
-                # This replaces st.write() and lets users manually change the text
-                edited_text = st.text_area(
-                    "Edit your story text here:", 
-                    value=page['story_text'], 
-                    key=f"edit_{page['page_number']}", 
-                    height=300
-                )
-                
-                # Pass the EDITED text straight into the audio generator
-                audio_bytes = generate_audio(edited_text)
-                if audio_bytes:
-                    st.audio(audio_bytes, format='audio/mp3')
+            with st.spinner("Painting image..."):
+                real_image = generate_image(current_prompt, st.session_state.story_seed)
+                if real_image:
+                    st.image(real_image)
                 else:
-                    st.error("Audio generation failed.")
+                    st.error("Image generation failed (Check API quota).")
             
-        st.divider()
+            st.text_area("Edit the full image prompt:", value=initial_full_prompt, key=widget_key, height=200)
+            
+        with col2:
+            st.markdown(f"### 📖 Story")
+            
+            edited_text = st.text_area(
+                "Edit your story text here:", 
+                value=page['story_text'], 
+                key=f"edit_{page['page_number']}", 
+                height=300
+            )
+            
+            audio_bytes = generate_audio(edited_text)
+            if audio_bytes:
+                st.audio(audio_bytes, format='audio/mp3')
+            else:
+                st.error("Audio generation failed.")
+                
+    st.divider()
+    
+    # NAVIGATION BUTTONS
+    nav_col1, nav_col2, nav_col3 = st.columns([1, 2, 1])
+    
+    with nav_col1:
+        # Only show "Previous" if we are not on the first page
+        if current_index > 0:
+            if st.button("⬅️ Previous Page"):
+                st.session_state.current_page -= 1
+                st.rerun()
+                
+    with nav_col3:
+        # Only show "Next" if we are not on the last page
+        if current_index < total_pages - 1:
+            if st.button("Next Page ➡️"):
+                st.session_state.current_page += 1
+                st.rerun()
