@@ -34,6 +34,7 @@ API_URL = "https://router.huggingface.co/hf-inference/models/stabilityai/stable-
 headers = {"Authorization": f"Bearer {hf_key}"}
 
 # Generate Image from Text 
+@st.cache_data
 def generate_image(prompt, seed):
     """
     Sends the text prompt to Hugging Face and returns the actual image.
@@ -52,6 +53,7 @@ def generate_image(prompt, seed):
         return None
 
 # Generate Audio from Text
+@st.cache_data
 def generate_audio(text):
     """
     Converts the story text into speech and returns it as audio bytes.
@@ -88,7 +90,13 @@ Structure:
 
 st.set_page_config(page_title="AI Storybook Phase 3", page_icon="🎨")
 
-# 3. Sidebar
+# 3. Sidebar & Session State
+if 'story_seed' not in st.session_state:
+    st.session_state.story_seed = random.randint(1, 1000000)
+
+if 'story_data' not in st.session_state:
+    st.session_state.story_data = None
+
 with st.sidebar:
     st.header("How to use")
     st.write("1. Enter a topic.")
@@ -100,60 +108,74 @@ st.title("Storybook Creator: Multimodal Build")
 # User Input
 user_topic = st.text_input("What should the story be about?", placeholder="e.g., A brave robot")
 
-# 4. GENERATION LOGIC
+# 4. GENERATION LOGIC (Data Fetching Only)
 if st.button("Generate Storyboard"):
     if not user_topic:
         st.warning("Please enter a topic first.")
     else:
-        # Generate ONE seed to be used for the entire story
-        story_seed = random.randint(1, 1000000) 
-        
+        st.session_state.story_seed = random.randint(1, 1000000) 
         with st.spinner("Writing story and painting pictures... (This may take 30s)"):
             try:
-                # STEP A: GENERATE TEXT (Gemini) 
+                # STEP A: GENERATE TEXT (Gemini)
                 full_prompt = f"{SYSTEM_PROMPT}\n\nTOPIC: {user_topic}"
                 response = model.generate_content(full_prompt)
                 
-                # Clean JSON
                 clean_text = response.text.strip().replace("```json", "").replace("```", "")
-                story_data = json.loads(clean_text)
                 
-                st.success(f"Generated: {story_data['title']}")
-                st.divider()
+                # SAVE TO MEMORY INSTEAD OF JUST A VARIABLE
+                st.session_state.story_data = json.loads(clean_text)
                 
-                # STEP B: GENERATE IMAGES (Hugging Face)
-                # Grab the master character description
-                character_context = story_data.get('character_design', '')
-                
-                for page in story_data['pages']:
-                    with st.container():
-                        st.subheader(f"Page {page['page_number']}")
-                        col1, col2 = st.columns([1, 1])
-                        
-                        with col1:
-                            st.info("🎨 Generating Art...")
-                            
-                            # GLUE THEM TOGETHER: Character Design + Scene Description
-                            full_prompt = f"{character_context} {page['image_prompt']}"
-                            
-                            # CALL THE NEW FUNCTION HERE WITH THE SEED AND FULL PROMPT
-                            real_image = generate_image(full_prompt, story_seed)                            
-                            if real_image:
-                                st.image(real_image, caption=full_prompt)
-                            else:
-                                st.error("Image generation failed (Check API quota).")
-                        
-                        with col2:
-                            st.markdown(f"### 📖 Story")
-                            st.write(page['story_text'])
-                            
-                            # GENERATE AND PLAY AUDIO
-                            audio_bytes = generate_audio(page['story_text'])
-                            if audio_bytes:
-                                st.audio(audio_bytes, format='audio/mp3')
-                            else:
-                                st.error("Audio generation failed.")                        
-                    st.divider()
-
             except Exception as e:
                 st.error(f"An error occurred: {e}")
+
+# 5. DISPLAY LOGIC (Interactive UI)
+# If a story exists in memory, display it
+if st.session_state.story_data:
+    story_data = st.session_state.story_data
+    
+    st.success(f"Generated: {story_data['title']}")
+    st.divider()
+    
+    # Grab the master character description
+    character_context = story_data.get('character_design', '')
+    
+    # STEP B: GENERATE IMAGES & AUDIO
+    for page in story_data['pages']:
+        with st.container():
+            st.subheader(f"Page {page['page_number']}")
+            col1, col2 = st.columns([1, 1])
+            
+            with col1:
+                st.info("🎨 Generating Art...")
+                
+                # Combine Character Design + Scene Description
+                full_prompt = f"{character_context} {page['image_prompt']}"
+                
+                # Call image function (It will instantly load from cache if already generated)
+                real_image = generate_image(full_prompt, st.session_state.story_seed)
+                
+                if real_image:
+                    st.image(real_image, caption=full_prompt)
+                else:
+                    st.error("Image generation failed (Check API quota).")
+            
+            with col2:
+                st.markdown(f"### 📖 Story")
+                
+                # THE EDITABLE TEXT BOX
+                # This replaces st.write() and lets users manually change the text
+                edited_text = st.text_area(
+                    "Edit your story text here:", 
+                    value=page['story_text'], 
+                    key=f"edit_{page['page_number']}", 
+                    height=120
+                )
+                
+                # Pass the EDITED text straight into the audio generator
+                audio_bytes = generate_audio(edited_text)
+                if audio_bytes:
+                    st.audio(audio_bytes, format='audio/mp3')
+                else:
+                    st.error("Audio generation failed.")
+            
+        st.divider()
