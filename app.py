@@ -81,9 +81,8 @@ Structure:
   "pages": [
     {
       "page_number": 1,
-      "story_text": "The narrative text (rhyming couplets suitable for children).",
-      "image_prompt": "Describe the background and action for this scene. DO NOT describe the character's physical appearance here. Include style keywords like 'watercolor'."
-    }
+"story_text": "The narrative text for the page. Write a fully developed, engaging paragraph of 4 to 6 sentences. Focus on descriptive storytelling rather than just a short rhyme.",
+      "image_prompt": "Describe the background and action for this scene. DO NOT describe the character's physical appearance here. Include style keywords like 'watercolor'."    }
   ]
 }
 """
@@ -180,7 +179,7 @@ if st.session_state.story_data:
                     "Edit your story text here:", 
                     value=page['story_text'], 
                     key=f"edit_{page['page_number']}", 
-                    height=120
+                    height=300
                 )
                 
                 # Pass the EDITED text straight into the audio generator
