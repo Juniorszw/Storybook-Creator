@@ -103,7 +103,7 @@ if 'story_data' not in st.session_state:
     st.session_state.story_data = None
 
 if 'current_page' not in st.session_state:
-    st.session_state.current_page = 0
+    st.session_state.current_page = -1
 
 with st.sidebar:
     st.header("How to use")
@@ -125,7 +125,8 @@ if st.button("Generate Storybook"):
     if not user_topic:
         st.warning("Please enter a topic first.")
     else:
-        st.session_state.story_seed = random.randint(1, 1000000) 
+        st.session_state.story_seed = random.randint(1, 1000000)
+        st.session_state.current_page = -1
         with st.spinner("Writing story and painting pictures... (This may take 30s)"):
             try:
                 # STEP A: GENERATE TEXT (Gemini)
@@ -145,7 +146,6 @@ if st.button("Generate Storybook"):
 if st.session_state.story_data:
     story_data = st.session_state.story_data
     
-    st.success(f"Generated: {story_data['title']}")
     st.divider()
     
     # Grab the master character description and total pages
@@ -154,62 +154,86 @@ if st.session_state.story_data:
     
     # PAGINATION LOGIC
     current_index = st.session_state.current_page
-    page = story_data['pages'][current_index]
     
-    # Left side = Image (col1), Right side = Text (col2)
-    col1, col2 = st.columns([1, 1])
-    
-    with col1:
-        # Create the "Left Page" rectangle
-        with st.container(border=True):
-            initial_full_prompt = f"{character_context} {page['image_prompt']}"
-            widget_key = f"img_edit_{page['page_number']}"
-            current_prompt = st.session_state.get(widget_key, initial_full_prompt)
-            
-            with st.spinner("Painting image..."):
-                real_image = generate_image(current_prompt, st.session_state.story_seed)
-                if real_image:
-                    st.image(real_image)
-                else:
-                    st.error("Image generation failed (Check API quota).")
-            
-            st.text_area("Edit the full image prompt:", value=initial_full_prompt, key=widget_key, height=215)
+    if current_index == -1:
+        # THE COVER PAGE
+        # We use columns to keep the cover centered and not stretched too wide
+        spacer1, cover_col, spacer2 = st.columns([1, 2, 1])
         
-    with col2:
-        # Create the "Right Page" rectangle
-        with st.container(border=True):
-            edited_text = st.text_area(
-                "Edit your story text here:", 
-                value=page['story_text'], 
-                key=f"edit_{page['page_number']}", 
-                height=430  # Made slightly taller to match image side
-            )
+        with cover_col:
+            with st.container(border=True):
+                
+                # Automatically create a cover prompt using the book's title
+                initial_full_prompt = f"{character_context} A beautiful storybook cover illustration for the story '{story_data['title']}'. Vibrant colors."
+                widget_key = "img_edit_cover"
+                current_prompt = st.session_state.get(widget_key, initial_full_prompt)
+                
+                with st.spinner("Painting cover image..."):
+                    real_image = generate_image(current_prompt, st.session_state.story_seed)
+                    if real_image:
+                        st.image(real_image, use_container_width=True)
+                    else:
+                        st.error("Image generation failed (Check API quota).")
+                
+                # The Title centered beneath the image
+                st.markdown(f"<h2 style='text-align: center;'>{story_data['title']}</h2>", unsafe_allow_html=True)
+                
+                st.text_area("Edit cover prompt:", value=initial_full_prompt, key=widget_key, height=100)
+                
+    else:
+        # THE STORY PAGES (2 Rectangles)
+        page = story_data['pages'][current_index]
+        
+        col1, col2 = st.columns([1, 1])
+        
+        with col1:
+            with st.container(border=True):
+                initial_full_prompt = f"{character_context} {page['image_prompt']}"
+                widget_key = f"img_edit_{page['page_number']}"
+                current_prompt = st.session_state.get(widget_key, initial_full_prompt)
+                
+                with st.spinner("Painting image..."):
+                    real_image = generate_image(current_prompt, st.session_state.story_seed)
+                    if real_image:
+                        st.image(real_image)
+                    else:
+                        st.error("Image generation failed (Check API quota).")
+                
+                st.text_area("Edit the full image prompt:", value=initial_full_prompt, key=widget_key, height=215)
             
-            audio_bytes = generate_audio(edited_text)
-            if audio_bytes:
-                st.audio(audio_bytes, format='audio/mp3')
-            else:
-                st.error("Audio generation failed.")
+        with col2:
+            with st.container(border=True):
+                edited_text = st.text_area(
+                    "Edit your story text here:", 
+                    value=page['story_text'], 
+                    key=f"edit_{page['page_number']}", 
+                    height=430 
+                )
+                
+                audio_bytes = generate_audio(edited_text)
+                if audio_bytes:
+                    st.audio(audio_bytes, format='audio/mp3')
+                else:
+                    st.error("Audio generation failed.")
+                
+                st.write("") 
+                st.write("")
+                st.markdown(f"<div style='text-align: right; color: gray;'><b>pg {page['page_number']}</b></div>", unsafe_allow_html=True)
             
-            # Add some spacing, then push the page number to the bottom right
-            st.write("") 
-            st.write("")
-            st.markdown(f"<div style='text-align: right; color: gray;'><b>pg {page['page_number']}</b></div>", unsafe_allow_html=True)
-            
-    st.divider()    
-
-    # NAVIGATION BUTTONS
+    st.divider()
+    
+    # NAVIGATION BUTTONS 
     nav_col1, nav_col2, nav_col3 = st.columns([1, 2, 1])
     
     with nav_col1:
-        # Only show "Previous" if we are not on the first page
-        if current_index > 0:
+        # Show "Previous" if we are past the cover page
+        if current_index > -1:
             if st.button("⬅️ Previous Page"):
                 st.session_state.current_page -= 1
                 st.rerun()
                 
     with nav_col3:
-        # Only show "Next" if we are not on the last page
+        # Show "Next" if we are not on the last page
         if current_index < total_pages - 1:
             if st.button("Next Page ➡️"):
                 st.session_state.current_page += 1
