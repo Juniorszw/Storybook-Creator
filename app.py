@@ -42,14 +42,20 @@ def generate_image(prompt, seed):
     payload = {"inputs": prompt,
         "parameters": {"seed": seed}
     }
-    try:
-        response = requests.post(API_URL, headers=headers, json=payload)
-        image_bytes = response.content
-        # Convert raw data into an image file
-        image = Image.open(BytesIO(image_bytes))
-        return image
-    except Exception as e:
-        print(f"Error generating image: {e}")
+    response = requests.post(API_URL, headers=headers, json=payload)
+        
+    # Check if Hugging Face actually gave us a successful "OK" status (200)
+    if response.status_code == 200:
+        try:
+            image = Image.open(BytesIO(response.content))
+            return image
+        except Exception as e:
+            # This catches the scenario where HF sends a 200 OK, but it's not a picture
+            print(f"Failed to open image. Raw API response: {response.text[:200]}")
+            return None
+    else:
+        # This catches actual HTTP errors (429 Rate Limit, 503 Model Loading, etc.)
+        print(f"Hugging Face Error ({response.status_code}): {response.text}")
         return None
 
 # Generate Audio from Text
