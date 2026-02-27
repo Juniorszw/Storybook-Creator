@@ -108,16 +108,20 @@ if 'current_page' not in st.session_state:
 with st.sidebar:
     st.header("How to use")
     st.write("1. Enter a topic.")
-    st.write("2. Click 'Generate'.")
-    st.info("Phase 3 Active: Real Image Generation Enabled! 🎨")
+    st.write("2. Click 'Generate Storybook'.")
+    st.write("3. Click on Image Prompt to edit image to your liking.")
+    st.write("4. Click on Story Text to edit story to your liking.")
+    st.write("5. Press CTRL + Enter to apply changes.")
+    st.write("6. Click on ▶ button to play audio.")
+    st.write("7. Click on Next Page ➡️ to navigate.")
 
-st.title("Storybook Creator: Multimodal Build")
+st.title("Storybook Creator")
 
 # User Input
 user_topic = st.text_input("What should the story be about?", placeholder="e.g., A brave robot")
 
 # 4. GENERATION LOGIC (Data Fetching Only)
-if st.button("Generate Storyboard"):
+if st.button("Generate Storybook"):
     if not user_topic:
         st.warning("Please enter a topic first.")
     else:
@@ -148,19 +152,16 @@ if st.session_state.story_data:
     character_context = story_data.get('character_design', '')
     total_pages = len(story_data['pages'])
     
-    # PAGINATION LOGIC 
-    # Instead of a loop, we only grab the page the user is currently on
+    # PAGINATION LOGIC
     current_index = st.session_state.current_page
     page = story_data['pages'][current_index]
     
-    with st.container():
-        st.subheader(f"Page {page['page_number']} of {total_pages}")
-        
-        # Left side = Image (col1), Right side = Text (col2)
-        col1, col2 = st.columns([1, 1])
-        
-        with col1:
-            st.info("🎨 Image Settings")
+    # Left side = Image (col1), Right side = Text (col2)
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        # Create the "Left Page" rectangle
+        with st.container(border=True):
             initial_full_prompt = f"{character_context} {page['image_prompt']}"
             widget_key = f"img_edit_{page['page_number']}"
             current_prompt = st.session_state.get(widget_key, initial_full_prompt)
@@ -172,16 +173,16 @@ if st.session_state.story_data:
                 else:
                     st.error("Image generation failed (Check API quota).")
             
-            st.text_area("Edit the full image prompt:", value=initial_full_prompt, key=widget_key, height=200)
-            
-        with col2:
-            st.markdown(f"### 📖 Story")
-            
+            st.text_area("Edit the full image prompt:", value=initial_full_prompt, key=widget_key, height=215)
+        
+    with col2:
+        # Create the "Right Page" rectangle
+        with st.container(border=True):
             edited_text = st.text_area(
                 "Edit your story text here:", 
                 value=page['story_text'], 
                 key=f"edit_{page['page_number']}", 
-                height=300
+                height=430  # Made slightly taller to match image side
             )
             
             audio_bytes = generate_audio(edited_text)
@@ -189,9 +190,14 @@ if st.session_state.story_data:
                 st.audio(audio_bytes, format='audio/mp3')
             else:
                 st.error("Audio generation failed.")
-                
-    st.divider()
-    
+            
+            # Add some spacing, then push the page number to the bottom right
+            st.write("") 
+            st.write("")
+            st.markdown(f"<div style='text-align: right; color: gray;'><b>pg {page['page_number']}</b></div>", unsafe_allow_html=True)
+            
+    st.divider()    
+
     # NAVIGATION BUTTONS
     nav_col1, nav_col2, nav_col3 = st.columns([1, 2, 1])
     
