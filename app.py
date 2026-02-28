@@ -171,6 +171,10 @@ with st.sidebar:
     st.write("5. Press CTRL + Enter to apply changes.")
     st.write("6. Click on ▶ button to play audio.")
     st.write("7. Click on Next Page ➡️ to navigate.")
+    st.divider()
+    if st.button("🔄 Start a New Book", use_container_width=True):
+        st.session_state.clear()
+        st.rerun()
 
 st.title("Storybook Creator")
 
