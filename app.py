@@ -247,3 +247,8 @@ if st.session_state.story_data:
             if st.button("Next Page ➡️"):
                 st.session_state.current_page += 1
                 st.rerun()
+        # Show "Go to Front" if we are on the last page
+        elif current_index == total_pages - 1:
+            if st.button("🔄 Go to Front"):
+                st.session_state.current_page = -1  # -1 is our cover page!
+                st.rerun()
