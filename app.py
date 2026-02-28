@@ -8,6 +8,8 @@ from io import BytesIO
 from dotenv import load_dotenv
 import random
 from gtts import gTTS
+from fpdf import FPDF
+import tempfile
 
 # 1. SETUP: Load Environment Variables
 load_dotenv()
@@ -72,6 +74,61 @@ def generate_audio(text):
     except Exception as e:
         print(f"Error generating audio: {e}")
         return None
+    
+# Generate PDF from Story Data
+def create_pdf(story_data, seed):
+    """Compiles the story text and images into a landscape PDF."""
+    pdf = FPDF(orientation='L', unit='mm', format='A4') # L = Landscape
+    pdf.set_auto_page_break(auto=True, margin=15)
+    
+    # Helper to clean AI text of weird characters for the PDF compiler
+    def safe_text(text):
+        return text.encode('latin-1', 'replace').decode('latin-1')
+
+    # 1. COVER PAGE 
+    pdf.add_page()
+    cover_prompt = story_data.get('cover_prompt', '')
+    cover_img = generate_image(cover_prompt, seed)
+    
+    if cover_img:
+        # FPDF needs an actual file to insert, so we save it to a temporary hidden file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
+            cover_img.save(tmp.name)
+            pdf.image(tmp.name, x=78, y=20, w=140) # Center the cover image
+            tmp_path = tmp.name
+        os.remove(tmp_path) # Clean up the temp file
+        
+    pdf.set_y(170)
+    pdf.set_font("Arial", 'B', 24)
+    pdf.cell(0, 10, safe_text(story_data['title']), ln=True, align='C')
+
+    # 2. STORY PAGES 
+    for page in story_data['pages']:
+        pdf.add_page()
+        
+        # Left Side: Image
+        img_prompt = page.get('full_image_prompt', page['image_prompt'])
+        page_img = generate_image(img_prompt, seed)
+        if page_img:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
+                page_img.save(tmp.name)
+                pdf.image(tmp.name, x=15, y=30, w=120) 
+                tmp_path = tmp.name
+            os.remove(tmp_path)
+            
+        # Right Side: Text
+        pdf.set_xy(145, 40)
+        pdf.set_font("Arial", '', 14)
+        pdf.multi_cell(135, 8, safe_text(page['story_text']))
+        
+        # Bottom Right: Page Number
+        pdf.set_y(180)
+        pdf.set_font("Arial", 'I', 10)
+        pdf.cell(0, 10, f"Page {page['page_number']}", ln=True, align='R')
+
+    # Return the raw PDF bytes for Streamlit to download
+    return pdf.output(dest='S').encode('latin-1')
+
 
 # 2. PROMPT ENGINEERING
 SYSTEM_PROMPT = """
@@ -163,13 +220,13 @@ if st.session_state.story_data:
         with cover_col:
             with st.container(border=True):
                 
-                # 1. Initialize permanent cover prompt if it doesn't exist
+                # Initialize permanent cover prompt if it doesn't exist
                 if 'cover_prompt' not in story_data:
                     story_data['cover_prompt'] = f"{character_context} A beautiful storybook cover illustration for the story '{story_data['title']}'. Vibrant colors."
                 
                 widget_key = "img_edit_cover"
                 
-                # 2. Look ahead in session_state, fallback to permanent memory
+                # Look ahead in session_state, fallback to permanent memory
                 current_prompt = st.session_state.get(widget_key, story_data['cover_prompt'])
                 
                 with st.spinner("Painting cover image..."):
@@ -182,9 +239,33 @@ if st.session_state.story_data:
                 # The Title centered beneath the image
                 st.markdown(f"<h2 style='text-align: center;'>{story_data['title']}</h2>", unsafe_allow_html=True)
                 
-                # 3. Render widget and update permanent memory
+                # PDF EXPORT FEATURE
+                st.write("") # Add a little space
+                col_dl1, col_dl2, col_dl3 = st.columns([1, 2, 1]) # 3 columns to center the buttons
+                
+                with col_dl2:
+                    # Button 1: Compile the book
+                    if st.button("🛠️ Compile to PDF", use_container_width=True):
+                        with st.spinner("Assembling your book..."):
+                            pdf_bytes = create_pdf(story_data, st.session_state.story_seed)
+                            st.session_state.pdf_data = pdf_bytes
+                            
+                    # Button 2: Appears only after compilation is done
+                    if 'pdf_data' in st.session_state:
+                        st.success("PDF Ready!")
+                        st.download_button(
+                            label="⬇️ Download Your Storybook",
+                            data=st.session_state.pdf_data,
+                            file_name=f"{story_data['title'].replace(' ', '_')}.pdf",
+                            mime="application/pdf",
+                            use_container_width=True
+                        )
+                
+                # Render the widget and update permanent memory
                 edited_cover = st.text_area("Edit cover prompt:", value=story_data['cover_prompt'], key=widget_key, height=100)
-                story_data['cover_prompt'] = edited_cover                
+                story_data['cover_prompt'] = edited_cover
+
+
     else:
         # THE STORY PAGES (2 Rectangles)
         page = story_data['pages'][current_index]
