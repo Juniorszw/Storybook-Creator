@@ -228,18 +228,26 @@ if st.session_state.story_data:
                 if 'cover_prompt' not in story_data:
                     story_data['cover_prompt'] = f"{character_context} A beautiful storybook cover illustration for the story '{story_data['title']}'. Vibrant colors."
                 
-                widget_key = "img_edit_cover"
+                # Assign a specific seed for the cover
+                if 'cover_seed' not in story_data:
+                    story_data['cover_seed'] = st.session_state.story_seed
                 
-                # Look ahead in session_state, fallback to permanent memory
+                widget_key = "img_edit_cover"
                 current_prompt = st.session_state.get(widget_key, story_data['cover_prompt'])
                 
                 with st.spinner("Painting cover image..."):
-                    real_image = generate_image(current_prompt, st.session_state.story_seed)
+                    # Use the cover-specific seed here
+                    real_image = generate_image(current_prompt, story_data['cover_seed'])
                     if real_image:
                         st.image(real_image, use_container_width=True)
                     else:
                         st.error("Image generation failed (Check API quota).")
                 
+                # Regenerate Button for Cover 
+                if st.button("🔄 Regenerate Image", use_container_width=True):
+                    story_data['cover_seed'] = random.randint(1, 1000000)
+                    st.rerun()
+
                 # The Editable Title beneath the image
                 edited_title = st.text_input("Edit Book Title:", value=story_data['title'], key="title_edit")
                 story_data['title'] = edited_title     
@@ -283,21 +291,29 @@ if st.session_state.story_data:
                 if 'full_image_prompt' not in page:
                     page['full_image_prompt'] = f"{character_context} {page['image_prompt']}"
                 
-                widget_key = f"img_edit_{page['page_number']}"
+                # Assign a specific seed for this page
+                if 'image_seed' not in page:
+                    page['image_seed'] = st.session_state.story_seed
                 
-                # 2. Look ahead in session_state, fallback to permanent memory
+                widget_key = f"img_edit_{page['page_number']}"
                 current_prompt = st.session_state.get(widget_key, page['full_image_prompt'])
                 
                 with st.spinner("Painting image..."):
-                    real_image = generate_image(current_prompt, st.session_state.story_seed)
+                    # Use the page-specific seed here
+                    real_image = generate_image(current_prompt, page['image_seed'])
                     if real_image:
                         st.image(real_image)
                     else:
                         st.error("Image generation failed (Check API quota).")
                 
+                # Regenerate Button
+                if st.button("🔄 Regenerate Image", key=f"regen_{page['page_number']}", use_container_width=True):
+                    page['image_seed'] = random.randint(1, 1000000)
+                    st.rerun()
+                
                 # 3. Render widget and update permanent memory
-                edited_prompt = st.text_area("Edit the full image prompt:", value=page['full_image_prompt'], key=widget_key, height=215)
-                page['full_image_prompt'] = edited_prompt   
+                edited_prompt = st.text_area("Edit the full image prompt:", value=page['full_image_prompt'], key=widget_key, height=170)
+                page['full_image_prompt'] = edited_prompt
 
         with col2:
             with st.container(border=True):
