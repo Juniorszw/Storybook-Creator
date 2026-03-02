@@ -240,9 +240,10 @@ if st.session_state.story_data:
                     else:
                         st.error("Image generation failed (Check API quota).")
                 
-                # The Title centered beneath the image
-                st.markdown(f"<h2 style='text-align: center;'>{story_data['title']}</h2>", unsafe_allow_html=True)
-                
+                # The Editable Title beneath the image
+                edited_title = st.text_input("Edit Book Title:", value=story_data['title'], key="title_edit")
+                story_data['title'] = edited_title     
+                           
                 # PDF EXPORT FEATURE
                 st.write("") # Add a little space
                 col_dl1, col_dl2, col_dl3 = st.columns([1, 2, 1]) # 3 columns to center the buttons
