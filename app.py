@@ -88,7 +88,8 @@ def create_pdf(story_data, seed):
     # Cover Page
     pdf.add_page()
     cover_prompt = story_data.get('cover_prompt', '')
-    cover_img = generate_image(cover_prompt, seed)
+    cover_seed = story_data.get('cover_seed', seed)
+    cover_img = generate_image(cover_prompt, cover_seed)
     
     if cover_img:
         # Save cover image to a temporary hidden file for FPDF
@@ -108,7 +109,8 @@ def create_pdf(story_data, seed):
         
         # Add image to the left side
         img_prompt = page.get('full_image_prompt', page['image_prompt'])
-        page_img = generate_image(img_prompt, seed)
+        page_seed = page.get('image_seed', seed)
+        page_img = generate_image(img_prompt, page_seed)
         if page_img:
             with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
                 page_img.save(tmp.name)
